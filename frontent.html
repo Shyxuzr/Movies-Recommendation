@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommender System</title>
+    <style>
+        /* CSS Styling for a dark, modern look */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #141414;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        .header {
+            background-color: #e50914;
+            padding: 20px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+        }
+        .search-box {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            width: 60%;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 30px;
+            border: none;
+            outline: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: #e50914;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #f40612;
+        }
+        /* Movie Cards Grid */
+        .recommendations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .movie-card {
+            background-color: #222;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            transition: transform 0.3s ease;
+        }
+        .movie-card:hover {
+            transform: translateY(-5px);
+            background-color: #333;
+        }
+        .movie-card h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+        .movie-card p {
+            color: #aaa;
+            font-size: 0.9rem;
+            margin-bottom: 0;
+        }
+        #loading {
+            display: none;
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-top: 20px;
+        }
+        .error {
+            color: #ff4d4d;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Movie Recommender</h1>
+    </div>
+
+    <div class="container">
+        <p>Enter your favorite movie and get 5 similar recommendations!</p>
+        
+        <div class="search-box">
+            <!-- Datalist is used for the dropdown suggestions -->
+            <input type="text" id="movieInput" list="movieList" placeholder="Search for a movie...">
+            <datalist id="movieList"></datalist>
+            
+            <button onclick="getRecommendations()">Recommend</button>
+        </div>
+
+        <div id="loading">Finding the best matches for you...</div>
+        
+        <!-- Results will be injected here -->
+        <div id="results" class="recommendations"></div>
+    </div>
+
+    <script>
+        // Adjust the URL if your Flask backend is running on a different port/host
+        const API_BASE_URL = "http://127.0.0.1:5000/api";
+
+        // Fetch the list of all movies to populate the dropdown datalist on page load
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/movies`);
+                const data = await response.json();
+                
+                const datalist = document.getElementById("movieList");
+                data.movies.forEach(movie => {
+                    const option = document.createElement("option");
+                    option.value = movie;
+                    datalist.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Error fetching movie list:", error);
+            }
+        });
+
+        // Fetch recommendations when the button is clicked
+        async function getRecommendations() {
+            const movieTitle = document.getElementById("movieInput").value.trim();
+            const resultsContainer = document.getElementById("results");
+            const loadingIndicator = document.getElementById("loading");
+
+            if (!movieTitle) {
+                alert("Please enter a movie name first.");
+                return;
+            }
+
+            // Clear previous results and show loading
+            resultsContainer.innerHTML = "";
+            loadingIndicator.style.display = "block";
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/recommend`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ movie: movieTitle })
+                });
+
+                const data = await response.json();
+                loadingIndicator.style.display = "none";
+
+                if (response.ok) {
+                    // Loop through recommendations and build cards
+                    data.recommendations.forEach(rec => {
+                        const card = document.createElement("div");
+                        card.className = "movie-card";
+                        
+                        card.innerHTML = `
+                            <h3>${rec.title}</h3>
+                            <p>Similarity Score: ${rec.score}</p>
+                        `;
+                        
+                        resultsContainer.appendChild(card);
+                    });
+                } else {
+                    // Handle errors (e.g., Movie not found)
+                    resultsContainer.innerHTML = `<p class="error">${data.error}</p>`;
+                }
+            } catch (error) {
+                loadingIndicator.style.display = "none";
+                resultsContainer.innerHTML = `<p class="error">Failed to connect to the backend server. Is Flask running?</p>`;
+                console.error("Error fetching recommendations:", error);
+            }
+        }
+    </script>
+</body>
+</html>
